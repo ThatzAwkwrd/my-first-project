@@ -475,6 +475,15 @@
     border-radius: 4px;
     font-size: 0.8rem;
   }
+
+  /* User location blue dot */
+  .user-dot {
+    width: 16px; height: 16px;
+    background: #1a73e8;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(26,115,232,0.6);
+  }
 </style>
 </head>
 <body>
@@ -666,6 +675,8 @@ let quaggaRunning = false;
 let currentBook = null;    // {title, author, coverUrl, isbn}
 let pinCallback = null;
 let unsubscribeBoxes = null;
+let userLocationMarker = null;
+let userLocationCircle = null;
 
 const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen'];
 let screenStack = ['map-screen'];
@@ -702,11 +713,19 @@ function init() {
 
   map.on('click', onMapClick);
 
-  // Auto-locate user
+  // Auto-locate user and keep tracking
   if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => map.flyTo([pos.coords.latitude, pos.coords.longitude], 15),
-      () => {} // silently stay on default center
+    navigator.geolocation.watchPosition(
+      pos => {
+        updateUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+        // Only fly to location on first fix
+        if (!userLocationMarker._hasCentered) {
+          map.flyTo([pos.coords.latitude, pos.coords.longitude], 15);
+          userLocationMarker._hasCentered = true;
+        }
+      },
+      () => {},
+      { enableHighAccuracy: true }
     );
   }
 
@@ -815,9 +834,9 @@ function upsertMarker(box) {
     markers[box.id].setIcon(makeIcon(isRecent(box)));
   } else {
     const m = L.marker([box.lat, box.lng], { icon: makeIcon(isRecent(box)) }).addTo(map);
-    m.bindPopup(() => makePopupContent(box));
     m.on('click', () => {
-      m.setPopupContent(makePopupContent(boxData[box.id] || box));
+      if (placementMode) return;
+      openDetail(box.id);
     });
     markers[box.id] = m;
   }
@@ -1195,9 +1214,32 @@ function locateMe() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   showToast('Finding your location…', 2000);
   navigator.geolocation.getCurrentPosition(
-    pos => map.flyTo([pos.coords.latitude, pos.coords.longitude], 16),
+    pos => {
+      updateUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      map.flyTo([pos.coords.latitude, pos.coords.longitude], 16);
+    },
     () => showToast('Location access denied')
   );
+}
+
+function updateUserLocation(lat, lng, accuracy) {
+  const latlng = [lat, lng];
+  if (userLocationMarker) {
+    userLocationMarker.setLatLng(latlng);
+    userLocationCircle.setLatLng(latlng).setRadius(accuracy || 30);
+  } else {
+    userLocationCircle = L.circle(latlng, {
+      radius: accuracy || 30,
+      color: '#1a73e8',
+      fillColor: '#1a73e8',
+      fillOpacity: 0.1,
+      weight: 1
+    }).addTo(map);
+    userLocationMarker = L.marker(latlng, {
+      icon: L.divIcon({ className: '', html: '<div class="user-dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] }),
+      zIndexOffset: 1000
+    }).addTo(map);
+  }
 }
 
 // ───────────────────────────────────────────────────────────────────
@@ -1256,8 +1298,9 @@ function requirePin(callback) {
 function checkPin() {
   const entered = document.getElementById('pin-input').value;
   if (entered === CONFIG.adminPin) {
+    const cb = pinCallback;
     closePinModal();
-    if (pinCallback) { pinCallback(); pinCallback = null; }
+    if (cb) cb();
   } else {
     document.getElementById('pin-error').style.display = 'block';
     document.getElementById('pin-input').value = '';
