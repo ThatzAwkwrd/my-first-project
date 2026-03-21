@@ -486,12 +486,12 @@
 const CONFIG = {
   // ── Firebase (get from Firebase console → Project settings → Your apps) ──
   firebase: {
-    apiKey:            "YOUR_API_KEY",
-    authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
-    projectId:         "YOUR_PROJECT_ID",
-    storageBucket:     "YOUR_PROJECT_ID.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId:             "YOUR_APP_ID"
+    apiKey:            "AIzaSyBgr8VZCOuYTWbLkEt0-DUb1jYa82BKQvU",
+    authDomain:        "bookbox-tracker.firebaseapp.com",
+    projectId:         "bookbox-tracker",
+    storageBucket:     "bookbox-tracker.firebasestorage.app",
+    messagingSenderId: "427579624299",
+    appId:             "1:427579624299:web:864c4be7b15d90548b1a2e"
   },
 
   // ── The public URL Firebase Hosting will give you ──
@@ -535,6 +535,7 @@ const CONFIG = {
     </div>
     <div id="map"></div>
     <div class="map-fab-group">
+      <button class="fab" onclick="locateMe()">📍 My Location</button>
       <button class="fab" onclick="openQrScanner()">📷 Scan QR</button>
       <button class="fab green" onclick="startAddBox()">+ Add Box</button>
     </div>
@@ -595,7 +596,15 @@ const CONFIG = {
 <!-- ── Screen 4: Add New Box ── -->
 <div id="add-box-screen" class="screen">
   <div class="add-box-body">
-    <div id="coords-display">Tap the map to set the location</div>
+    <div class="form-group">
+      <label>Search by address</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="address-search" placeholder="e.g. 123 Main St, Baton Rouge" onkeyup="if(event.key==='Enter') searchAddress()">
+        <button onclick="searchAddress()" id="addr-search-btn" style="background:#1565c0;color:#fff;border:none;border-radius:8px;padding:10px 14px;font-size:0.9rem;cursor:pointer;white-space:nowrap;flex-shrink:0;">Search</button>
+      </div>
+    </div>
+    <div id="coords-display">No location set yet</div>
+    <button onclick="startMapPlacement()" style="background:none;border:1.5px solid #5c4a32;color:#5c4a32;border-radius:20px;padding:8px 16px;font-size:0.85rem;cursor:pointer;width:100%;margin-bottom:14px;">Or tap the map to place pin</button>
     <div class="form-group">
       <label>Box name</label>
       <input type="text" id="box-name" placeholder="e.g. Maple &amp; 5th Ave">
@@ -686,12 +695,20 @@ function init() {
 
   // Init map
   map = L.map('map', { zoomControl: true }).setView(CONFIG.mapCenter, CONFIG.mapZoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
     maxZoom: 19
   }).addTo(map);
 
   map.on('click', onMapClick);
+
+  // Auto-locate user
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => map.flyTo([pos.coords.latitude, pos.coords.longitude], 15),
+      () => {} // silently stay on default center
+    );
+  }
 
   // Subscribe to book boxes (real-time)
   if (db) {
@@ -831,18 +848,19 @@ function makePopupContent(box) {
 
 function onMapClick(e) {
   if (!placementMode) return;
+  placementMode = false;
+  document.getElementById('placement-banner').style.display = 'none';
   pendingCoords = e.latlng;
   const coordsEl = document.getElementById('coords-display');
   coordsEl.textContent = `📍 ${e.latlng.lat.toFixed(5)}, ${e.latlng.lng.toFixed(5)}`;
   coordsEl.classList.add('set');
   document.getElementById('save-box-btn').disabled = false;
-  // Visual temp marker
   if (window._tempMarker) map.removeLayer(window._tempMarker);
   window._tempMarker = L.circleMarker(e.latlng, {
     radius: 10, color: '#e65100', fillColor: '#ff5722', fillOpacity: 0.8
   }).addTo(map);
   showScreen('add-box-screen');
-  updateHeader('New Book Box', `${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`);
+  updateHeader('New Book Box', '');
 }
 
 // ───────────────────────────────────────────────────────────────────
@@ -1112,19 +1130,23 @@ function sendNtfy(boxName, bookTitle, author) {
 // ───────────────────────────────────────────────────────────────────
 function startAddBox() {
   requirePin(() => {
-    // Enter placement mode on the map
-    placementMode = true;
     pendingCoords = null;
-    document.getElementById('placement-banner').style.display = 'block';
-    document.getElementById('coords-display').textContent = 'Tap the map to set the location';
+    document.getElementById('coords-display').textContent = 'No location set yet';
     document.getElementById('coords-display').classList.remove('set');
     document.getElementById('box-name').value = '';
     document.getElementById('box-desc').value = '';
+    document.getElementById('address-search').value = '';
     document.getElementById('save-box-btn').disabled = true;
-    showScreen('map-screen');
-    screenStack = ['map-screen', 'add-box-screen'];
-    updateHeader('📍 Place Book Box', 'Tap map to set location');
+    if (window._tempMarker) { map.removeLayer(window._tempMarker); window._tempMarker = null; }
+    navigate('add-box-screen', 'New Book Box', '');
   });
+}
+
+function startMapPlacement() {
+  placementMode = true;
+  document.getElementById('placement-banner').style.display = 'block';
+  showScreen('map-screen');
+  updateHeader('📍 Place Book Box', 'Tap map to set location');
 }
 
 function cancelPlacement() {
@@ -1163,6 +1185,51 @@ async function saveNewBox() {
     showToast('Error saving box: ' + e.message);
     btn.disabled = false;
     btn.textContent = 'Save Book Box';
+  }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Locate Me
+// ───────────────────────────────────────────────────────────────────
+function locateMe() {
+  if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+  showToast('Finding your location…', 2000);
+  navigator.geolocation.getCurrentPosition(
+    pos => map.flyTo([pos.coords.latitude, pos.coords.longitude], 16),
+    () => showToast('Location access denied')
+  );
+}
+
+// ───────────────────────────────────────────────────────────────────
+// Address Search (Nominatim)
+// ───────────────────────────────────────────────────────────────────
+async function searchAddress() {
+  const query = document.getElementById('address-search').value.trim();
+  if (!query) return;
+  const btn = document.getElementById('addr-search-btn');
+  btn.textContent = '…';
+  btn.disabled = true;
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
+    const resp = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await resp.json();
+    if (!data.length) { showToast('Address not found — try a different search'); return; }
+    const { lat, lon, display_name } = data[0];
+    pendingCoords = { lat: parseFloat(lat), lng: parseFloat(lon) };
+    const coordsEl = document.getElementById('coords-display');
+    coordsEl.textContent = `📍 ${display_name}`;
+    coordsEl.classList.add('set');
+    document.getElementById('save-box-btn').disabled = false;
+    map.flyTo([lat, lon], 17);
+    if (window._tempMarker) map.removeLayer(window._tempMarker);
+    window._tempMarker = L.circleMarker([lat, lon], {
+      radius: 10, color: '#e65100', fillColor: '#ff5722', fillOpacity: 0.8
+    }).addTo(map);
+  } catch(e) {
+    showToast('Search failed — check your connection');
+  } finally {
+    btn.textContent = 'Search';
+    btn.disabled = false;
   }
 }
 
