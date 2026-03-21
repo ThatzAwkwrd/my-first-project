@@ -694,6 +694,17 @@ const CONFIG = {
   <div class="qr-list-body" id="qr-list-body"></div>
 </div>
 
+<!-- ── Screen 7: QR Camera Scanner ── -->
+<div id="qr-scan-screen" class="screen">
+  <div style="flex:1;display:flex;flex-direction:column;background:#000;">
+    <video id="qr-video" autoplay playsinline muted style="flex:1;object-fit:cover;"></video>
+    <canvas id="qr-canvas" style="display:none;"></canvas>
+    <div style="position:absolute;bottom:24px;left:0;right:0;text-align:center;">
+      <span style="background:rgba(0,0,0,0.6);color:#fff;padding:8px 16px;border-radius:20px;font-size:0.85rem;">Point camera at a Book Box QR code</span>
+    </div>
+  </div>
+</div>
+
 <!-- PIN modal -->
 <div id="pin-modal">
   <div class="pin-dialog">
@@ -727,6 +738,9 @@ const CONFIG = {
 <!-- QuaggaJS (barcode scanner) -->
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
 
+<!-- jsQR (QR code scanner) -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
 <script>
 // ───────────────────────────────────────────────────────────────────
 // State
@@ -746,7 +760,7 @@ let unsubscribeBoxes = null;
 let userLocationMarker = null;
 let userLocationCircle = null;
 
-const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen'];
+const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen'];
 let screenStack = ['map-screen'];
 
 // ───────────────────────────────────────────────────────────────────
@@ -843,6 +857,7 @@ function navigate(screenId, title, subtitle) {
 
 function goBack() {
   if (scannerActive) stopScanner();
+  if (qrStream) stopQrCamera();
   screenStack.pop();
   const prev = screenStack[screenStack.length - 1] || 'map-screen';
   const titles = {
@@ -1408,12 +1423,71 @@ function openQrList() {
 }
 
 // ───────────────────────────────────────────────────────────────────
-// QR Scanner (for scanning box QR codes from the map screen)
+// QR Scanner (camera-based, for scanning box QR codes from map)
 // ───────────────────────────────────────────────────────────────────
+let qrStream = null;
+let qrAnimFrame = null;
+
 function openQrScanner() {
-  // Simple: ask user to scan using their phone's native camera or prompt for box ID
-  const id = prompt('Enter Book Box ID (from QR code URL ?box=ID):');
-  if (id && id.trim()) openAddBook(id.trim());
+  navigate('qr-scan-screen', 'Scan QR Code', '');
+  startQrCamera();
+}
+
+async function startQrCamera() {
+  const video = document.getElementById('qr-video');
+  try {
+    qrStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    video.srcObject = qrStream;
+    video.play();
+    video.addEventListener('loadeddata', () => scanQrFrame(), { once: true });
+  } catch(e) {
+    showToast('Camera not available');
+    goBack();
+  }
+}
+
+function scanQrFrame() {
+  const video = document.getElementById('qr-video');
+  const canvas = document.getElementById('qr-canvas');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+  function tick() {
+    if (!qrStream) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, canvas.width, canvas.height);
+      if (code && code.data) {
+        // Check if it's a bookbox URL
+        const match = code.data.match(/[?&]box=([^&]+)/);
+        if (match) {
+          stopQrCamera();
+          showToast('Box found!');
+          openDetail(match[1]);
+          return;
+        }
+      }
+    }
+    qrAnimFrame = requestAnimationFrame(tick);
+  }
+  tick();
+}
+
+function stopQrCamera() {
+  if (qrStream) {
+    qrStream.getTracks().forEach(t => t.stop());
+    qrStream = null;
+  }
+  if (qrAnimFrame) {
+    cancelAnimationFrame(qrAnimFrame);
+    qrAnimFrame = null;
+  }
+  const video = document.getElementById('qr-video');
+  if (video) video.srcObject = null;
 }
 
 // ───────────────────────────────────────────────────────────────────
