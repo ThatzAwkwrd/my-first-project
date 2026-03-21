@@ -484,6 +484,59 @@
     border-radius: 50%;
     box-shadow: 0 0 6px rgba(26,115,232,0.6);
   }
+
+  /* ── City List Screen ── */
+  #city-list-screen { overflow-y: auto; }
+  .city-list-header {
+    padding: 16px 16px 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #999;
+  }
+  .city-list-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 8px 16px 24px;
+  }
+  .city-list-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    cursor: pointer;
+    transition: box-shadow 0.15s;
+  }
+  .city-list-card:active { box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .city-list-card h3 { font-size: 0.9rem; margin-bottom: 4px; line-height: 1.3; }
+  .city-list-card p { font-size: 0.75rem; color: #888; line-height: 1.3; }
+  .city-list-card .card-badge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  /* ── QR List Screen ── */
+  #qr-list-screen { overflow-y: auto; }
+  .qr-list-body { padding: 16px; padding-bottom: 40px; }
+  .qr-list-item {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .qr-list-item h3 { font-size: 1rem; text-align: center; }
+  .qr-list-item p { font-size: 0.75rem; color: #888; text-align: center; word-break: break-all; }
 </style>
 </head>
 <body>
@@ -545,6 +598,7 @@ const CONFIG = {
     <div id="map"></div>
     <div class="map-fab-group">
       <button class="fab" onclick="locateMe()">📍 My Location</button>
+      <button class="fab" onclick="openCityList()">📋 City List</button>
       <button class="fab" onclick="openQrScanner()">📷 Scan QR</button>
       <button class="fab green" onclick="startAddBox()">+ Add Box</button>
     </div>
@@ -623,7 +677,20 @@ const CONFIG = {
       <input type="text" id="box-desc" placeholder="e.g. Red wooden box on a post">
     </div>
     <button id="save-box-btn" onclick="saveNewBox()" disabled>Save Book Box</button>
+    <div class="or-divider" style="margin:18px 0;">admin tools</div>
+    <button onclick="openQrList()" style="background:none;border:1.5px solid #5c4a32;color:#5c4a32;border-radius:20px;padding:10px 16px;font-size:0.9rem;cursor:pointer;width:100%;">🖨️ Print All QR Codes</button>
   </div>
+</div>
+
+<!-- ── Screen 5: City List ── -->
+<div id="city-list-screen" class="screen">
+  <div class="city-list-header" id="city-list-title">Ponchatoula, Louisiana</div>
+  <div class="city-list-grid" id="city-list-grid"></div>
+</div>
+
+<!-- ── Screen 6: QR Codes List (Admin) ── -->
+<div id="qr-list-screen" class="screen">
+  <div class="qr-list-body" id="qr-list-body"></div>
 </div>
 
 <!-- PIN modal -->
@@ -678,7 +745,7 @@ let unsubscribeBoxes = null;
 let userLocationMarker = null;
 let userLocationCircle = null;
 
-const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen'];
+const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen'];
 let screenStack = ['map-screen'];
 
 // ───────────────────────────────────────────────────────────────────
@@ -1273,6 +1340,67 @@ async function searchAddress() {
     btn.textContent = 'Search';
     btn.disabled = false;
   }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// City List
+// ───────────────────────────────────────────────────────────────────
+function openCityList() {
+  const grid = document.getElementById('city-list-grid');
+  const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  if (!boxes.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;">No book boxes yet.</div>';
+  } else {
+    grid.innerHTML = boxes.map(box => {
+      const count = (box.books || []).length;
+      const recent = isRecent(box);
+      return `
+        <div class="city-list-card" onclick="openDetail('${box.id}')">
+          <h3>${escHtml(box.name)}</h3>
+          <p>${escHtml(box.description || '')}</p>
+          <span class="card-badge" style="background:${recent ? '#e8f5e9;color:#2e7d32' : '#f0f0f0;color:#888'}">
+            ${recent ? '🟢 New books' : count + ' book' + (count !== 1 ? 's' : '')}
+          </span>
+        </div>`;
+    }).join('');
+  }
+  navigate('city-list-screen', 'Ponchatoula, Louisiana', boxes.length + ' book boxes');
+}
+
+// ───────────────────────────────────────────────────────────────────
+// QR Codes List (Admin)
+// ───────────────────────────────────────────────────────────────────
+function openQrList() {
+  requirePin(() => {
+    const body = document.getElementById('qr-list-body');
+    const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    if (!boxes.length) {
+      body.innerHTML = '<div class="empty-state">No book boxes yet.</div>';
+    } else {
+      body.innerHTML = boxes.map(box => {
+        const url = `${CONFIG.appUrl}?box=${box.id}`;
+        return `
+          <div class="qr-list-item">
+            <h3>${escHtml(box.name)}</h3>
+            <div id="qr-all-${box.id}"></div>
+            <p>${url}</p>
+          </div>`;
+      }).join('');
+      // Generate QR codes after DOM is ready
+      setTimeout(() => {
+        boxes.forEach(box => {
+          const url = `${CONFIG.appUrl}?box=${box.id}`;
+          const container = document.getElementById('qr-all-' + box.id);
+          if (container) {
+            QRCode.toCanvas(document.createElement('canvas'), url, { width: 200, margin: 2 }, (err, canvas) => {
+              if (!err) { canvas.style.borderRadius = '6px'; container.appendChild(canvas); }
+            });
+          }
+        });
+      }, 50);
+    }
+    navigate('qr-list-screen', 'QR Codes', 'Print these for your boxes');
+  });
 }
 
 // ───────────────────────────────────────────────────────────────────
