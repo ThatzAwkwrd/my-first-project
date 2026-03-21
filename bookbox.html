@@ -1396,29 +1396,13 @@ function openQrList() {
     if (!boxes.length) {
       body.innerHTML = '<div class="empty-state">No book boxes yet.</div>';
     } else {
-      body.innerHTML = boxes.map(box => {
-        const url = `${CONFIG.appUrl}?box=${box.id}`;
-        return `
-          <div class="qr-list-item">
-            <h3>${escHtml(box.name)}</h3>
-            <div id="qr-all-${box.id}"></div>
-            <p>${url}</p>
-          </div>`;
-      }).join('');
-      // Generate QR codes after DOM is ready
-      setTimeout(() => {
-        boxes.forEach(box => {
-          const url = `${CONFIG.appUrl}?box=${box.id}`;
-          const container = document.getElementById('qr-all-' + box.id);
-          if (container) {
-            QRCode.toCanvas(document.createElement('canvas'), url, { width: 200, margin: 2 }, (err, canvas) => {
-              if (!err) { canvas.style.borderRadius = '6px'; container.appendChild(canvas); }
-            });
-          }
-        });
-      }, 50);
+      body.innerHTML = boxes.map(box => `
+        <div class="qr-list-item" onclick="openDetail('${box.id}')" style="cursor:pointer;">
+          <h3>${escHtml(box.name)}</h3>
+          <p style="color:#5c4a32;">Tap to view QR code →</p>
+        </div>`).join('');
     }
-    navigate('qr-list-screen', 'QR Codes', 'Print these for your boxes');
+    navigate('qr-list-screen', 'QR Codes', boxes.length + ' book boxes');
   });
 }
 
