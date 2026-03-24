@@ -782,8 +782,7 @@ const CONFIG = {
 <!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<!-- QRCode.js -->
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<!-- QR codes generated via api.qrserver.com (no JS library needed) -->
 
 <!-- QuaggaJS (barcode scanner) -->
 <script src="https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js"></script>
@@ -1030,25 +1029,11 @@ function openDetail(boxId) {
   document.getElementById('detail-desc').textContent =
     `${(box.books||[]).length} books logged · Added ${formatDate(box.addedAt)}`;
 
-  // Generate QR code as image (long-press to save on phone)
+  // Generate QR code via API
   const url = `${CONFIG.appUrl}?box=${boxId}`;
   document.getElementById('qr-url').textContent = url;
   const qrDiv = document.getElementById('qr-code-div');
-  qrDiv.innerHTML = '';
-  QRCode.toDataURL(url, { width: 250, margin: 2 }, (err, dataUrl) => {
-    if (!err) {
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.alt = 'QR Code for ' + (box.name || 'book box');
-      img.style.width = '250px';
-      img.style.height = '250px';
-      img.style.borderRadius = '6px';
-      qrDiv.appendChild(img);
-    } else {
-      qrDiv.textContent = 'QR code failed to generate';
-      console.error('QR error:', err);
-    }
-  });
+  qrDiv.innerHTML = `<img src="${qrImageUrl(url)}" alt="QR Code for ${escHtml(box.name)}" width="250" height="250" style="border-radius:6px;">`;
 
   renderBooks(box.books || []);
   navigate('detail-screen', box.name, box.description);
@@ -1474,19 +1459,7 @@ function showQrModal(boxId) {
   document.getElementById('qr-modal-title').textContent = box.name;
   document.getElementById('qr-modal-url').textContent = url;
   const imgDiv = document.getElementById('qr-modal-img');
-  imgDiv.innerHTML = '';
-  QRCode.toDataURL(url, { width: 280, margin: 2 }, (err, dataUrl) => {
-    if (!err) {
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.alt = 'QR Code for ' + box.name;
-      img.style.width = '280px';
-      img.style.height = '280px';
-      imgDiv.appendChild(img);
-    } else {
-      imgDiv.textContent = 'Failed to generate QR code';
-    }
-  });
+  imgDiv.innerHTML = `<img src="${qrImageUrl(url)}" alt="QR Code for ${escHtml(box.name)}" width="280" height="280" style="border-radius:6px;">`;
   document.getElementById('qr-modal').classList.add('show');
 }
 
@@ -1599,6 +1572,10 @@ function showToast(msg, duration = 2800) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function qrImageUrl(data) {
+  return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(data)}`;
 }
 
 function escHtml(str) {
