@@ -777,7 +777,6 @@ const CONFIG = {
     <div class="detail-section-title">Activity</div>
     <div id="analytics-bar" style="display:flex;gap:10px;margin-bottom:16px;">
       <div class="stat-card"><div class="stat-number" id="stat-visits">--</div><div class="stat-label">Total visits</div></div>
-      <div class="stat-card"><div class="stat-number" id="stat-unique">--</div><div class="stat-label">Unique visitors</div></div>
       <div class="stat-card"><div class="stat-number" id="stat-checkins">--</div><div class="stat-label">Books added</div></div>
     </div>
     <div class="detail-section-title">Books logged</div>
@@ -1222,7 +1221,6 @@ function openDetail(boxId) {
 
   // Populate analytics
   document.getElementById('stat-visits').textContent = box.totalVisits || 0;
-  document.getElementById('stat-unique').textContent = box.uniqueVisitors || 0;
   document.getElementById('stat-checkins').textContent = (box.books || []).length;
 
   renderBooks(box.books || []);
