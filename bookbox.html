@@ -515,6 +515,28 @@
     margin-top: 10px;
   }
 
+  /* Analytics stat cards */
+  .stat-card {
+    flex: 1;
+    background: #fff;
+    border-radius: 10px;
+    padding: 12px 8px;
+    text-align: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .stat-number {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: #5c4a32;
+  }
+  .stat-label {
+    font-size: 0.7rem;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+  }
+
   /* User location blue dot */
   .user-dot {
     width: 16px; height: 16px;
@@ -653,6 +675,12 @@ const CONFIG = {
       <div style="font-size:0.85rem;color:#777;margin-top:6px;">Leave a book to help spread knowledge through our great community. Tap the button below to log a book you're adding!</div>
     </div>
     <p class="detail-meta" id="detail-desc"></p>
+    <div class="detail-section-title">Activity</div>
+    <div id="analytics-bar" style="display:flex;gap:10px;margin-bottom:16px;">
+      <div class="stat-card"><div class="stat-number" id="stat-visits">--</div><div class="stat-label">Total visits</div></div>
+      <div class="stat-card"><div class="stat-number" id="stat-unique">--</div><div class="stat-label">Unique visitors</div></div>
+      <div class="stat-card"><div class="stat-number" id="stat-checkins">--</div><div class="stat-label">Books added</div></div>
+    </div>
     <div class="detail-section-title">QR Code for this box</div>
     <div id="qr-container">
       <div id="qr-code-div"></div>
@@ -1027,6 +1055,9 @@ function openDetail(boxId) {
   const box = boxData[boxId];
   if (!box) { showToast('Box not found'); return; }
 
+  // Record visit (fire-and-forget)
+  recordVisit(boxId);
+
   // Show welcome banner if user arrived via QR code scan
   const isQrVisitor = new URLSearchParams(window.location.search).has('box');
   document.getElementById('welcome-banner').style.display = isQrVisitor ? 'block' : 'none';
@@ -1037,6 +1068,11 @@ function openDetail(boxId) {
   updateHeader(box.name, box.description);
   document.getElementById('detail-desc').textContent =
     `${(box.books||[]).length} books logged · Added ${formatDate(box.addedAt)}`;
+
+  // Populate analytics
+  document.getElementById('stat-visits').textContent = box.totalVisits || 0;
+  document.getElementById('stat-unique').textContent = box.uniqueVisitors || 0;
+  document.getElementById('stat-checkins').textContent = (box.books || []).length;
 
   // Generate QR code via API
   const url = `${CONFIG.appUrl}?box=${boxId}`;
@@ -1242,7 +1278,8 @@ async function submitBook() {
 
     // Append book to Firestore array
     await db.collection('bookboxes').doc(currentBoxId).update({
-      books: firebase.firestore.FieldValue.arrayUnion(book)
+      books: firebase.firestore.FieldValue.arrayUnion(book),
+      checkIns: firebase.firestore.FieldValue.increment(1)
     });
 
     // Update local cache optimistically
@@ -1581,6 +1618,46 @@ function showToast(msg, duration = 2800) {
   t.textContent = msg;
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function getVisitorId() {
+  let id = localStorage.getItem('bookbox_visitor_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('bookbox_visitor_id', id);
+  }
+  return id;
+}
+
+async function recordVisit(boxId) {
+  if (!db) return;
+  const visitorId = getVisitorId();
+  // Skip if already recorded this session
+  if (sessionStorage.getItem('visited_' + boxId)) return;
+  sessionStorage.setItem('visited_' + boxId, '1');
+
+  const boxRef = db.collection('bookboxes').doc(boxId);
+  const visitorRef = boxRef.collection('visitors').doc(visitorId);
+
+  try {
+    const visitorSnap = await visitorRef.get();
+    if (visitorSnap.exists) {
+      await Promise.all([
+        boxRef.update({ totalVisits: firebase.firestore.FieldValue.increment(1) }),
+        visitorRef.update({ lastSeen: new Date(), visitCount: firebase.firestore.FieldValue.increment(1) })
+      ]);
+    } else {
+      await Promise.all([
+        boxRef.update({
+          totalVisits: firebase.firestore.FieldValue.increment(1),
+          uniqueVisitors: firebase.firestore.FieldValue.increment(1)
+        }),
+        visitorRef.set({ firstSeen: new Date(), lastSeen: new Date(), visitCount: 1 })
+      ]);
+    }
+  } catch(e) {
+    console.warn('Analytics recording failed (non-fatal):', e);
+  }
 }
 
 function qrImageUrl(data) {
