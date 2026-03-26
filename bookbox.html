@@ -847,7 +847,15 @@ const CONFIG = {
       <button onclick="openQrList()" class="admin-tool-btn">🖨️ QR Codes</button>
       <button onclick="openSubmissions()" class="admin-tool-btn">📬 Submissions</button>
       <button onclick="openAnalytics()" class="admin-tool-btn">📊 Analytics</button>
+      <button onclick="openAllBooks()" class="admin-tool-btn">📖 All Books</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Screen 10: All Books (Admin) ── -->
+<div id="all-books-screen" class="screen">
+  <div style="padding:16px;overflow-y:auto;flex:1;">
+    <div id="all-books-list"></div>
   </div>
 </div>
 
@@ -974,7 +982,7 @@ let unsubscribeBoxes = null;
 let userLocationMarker = null;
 let userLocationCircle = null;
 
-const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen', 'analytics-screen'];
+const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen', 'analytics-screen', 'all-books-screen'];
 let screenStack = ['map-screen'];
 
 // ───────────────────────────────────────────────────────────────────
@@ -1683,6 +1691,68 @@ async function openSubmissions() {
   } catch(e) {
     console.error(e);
     list.innerHTML = '<div class="empty-state">Error loading submissions.</div>';
+  }
+}
+
+function openAllBooks() {
+  const list = document.getElementById('all-books-list');
+  const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  let totalBooks = 0;
+  let html = '';
+
+  boxes.forEach(box => {
+    const books = box.books || [];
+    if (!books.length) return;
+    totalBooks += books.length;
+    html += `<div style="margin-bottom:20px;">
+      <div style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#999;margin-bottom:8px;">${escHtml(box.name)} (${books.length})</div>`;
+    books.forEach((book, i) => {
+      html += `
+        <div class="book-item" id="book-${box.id}-${i}" style="position:relative;">
+          ${book.coverUrl
+            ? `<img class="book-cover" src="${escHtml(book.coverUrl)}" alt="cover" onerror="this.style.display='none'">`
+            : `<div class="book-cover-placeholder">📖</div>`}
+          <div class="book-info">
+            <div class="book-title">${escHtml(book.title || 'Unknown title')}</div>
+            <div class="book-author">${escHtml(book.author || '')}</div>
+            <div class="book-date">${formatDate(book.addedAt)}</div>
+          </div>
+          <button onclick="deleteBook('${box.id}', ${i})" style="position:absolute;top:8px;right:8px;background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;font-size:0.85rem;cursor:pointer;color:#888;line-height:28px;text-align:center;">✕</button>
+        </div>`;
+    });
+    html += '</div>';
+  });
+
+  if (!totalBooks) {
+    list.innerHTML = '<div class="empty-state">No books logged yet.</div>';
+  } else {
+    list.innerHTML = html;
+  }
+  navigate('all-books-screen', 'All Books', totalBooks + ' books');
+}
+
+async function deleteBook(boxId, bookIndex) {
+  const box = boxData[boxId];
+  if (!box || !box.books || !box.books[bookIndex]) return;
+  const book = box.books[bookIndex];
+  const title = book.title || 'this book';
+
+  if (!confirm(`Delete "${title}" from ${box.name}?`)) return;
+
+  try {
+    if (!db) throw new Error('Firebase not configured');
+    // Remove the book from the array
+    await db.collection('bookboxes').doc(boxId).update({
+      books: firebase.firestore.FieldValue.arrayRemove(book)
+    });
+    // Update local cache
+    box.books.splice(bookIndex, 1);
+    showToast('Book removed');
+    // Re-render the list
+    openAllBooks();
+  } catch(e) {
+    console.error(e);
+    showToast('Error removing book: ' + e.message);
   }
 }
 
