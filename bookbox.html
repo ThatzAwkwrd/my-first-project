@@ -1430,7 +1430,14 @@ async function submitBook() {
     sendNtfy(boxName, book.title, book.author);
 
     showToast('Book added! 🎉');
+    // Go back and refresh the detail view with the new book
     goBack();
+    if (boxData[currentBoxId]) {
+      renderBooks(boxData[currentBoxId].books || []);
+      document.getElementById('detail-desc').textContent =
+        `${(boxData[currentBoxId].books||[]).length} books logged · Added ${formatDate(boxData[currentBoxId].addedAt)}`;
+      document.getElementById('stat-checkins').textContent = (boxData[currentBoxId].books || []).length;
+    }
   } catch(e) {
     console.error(e);
     showToast('Error saving book: ' + e.message);
