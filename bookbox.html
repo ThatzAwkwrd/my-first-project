@@ -482,6 +482,28 @@
     font-size: 0.8rem;
   }
 
+  /* Submit box modal */
+  #submit-box-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #submit-box-modal.show { display: flex; }
+  .submit-box-dialog {
+    background: #fff;
+    border-radius: 16px;
+    padding: 28px 24px;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  }
+  .submit-box-dialog h2 { font-size: 1.1rem; margin-bottom: 6px; }
+
   /* QR popup modal */
   #qr-modal {
     display: none;
@@ -661,7 +683,7 @@ const CONFIG = {
       <button class="fab" onclick="locateMe()">📍 My Location</button>
       <button class="fab" onclick="openCityList()">📋 City List</button>
       <button class="fab" onclick="openQrScanner()">📷 Scan QR</button>
-      <button class="fab green" onclick="startAddBox()">+ Add Box</button>
+      <button class="fab green" onclick="showSubmitBoxPanel()">+ Add Box</button>
     </div>
   </div>
 </div>
@@ -770,6 +792,27 @@ const CONFIG = {
   </div>
 </div>
 
+<!-- Submit Box Location panel -->
+<div id="submit-box-modal">
+  <div class="submit-box-dialog">
+    <h2>Submit Book Box Location</h2>
+    <p style="color:#666;font-size:0.85rem;line-height:1.5;margin-bottom:16px;">Know of a Little Free Library or book box in the area? Let us know where it is and we'll add it to the map!</p>
+    <div class="form-group">
+      <label>Location or address</label>
+      <input type="text" id="submit-box-location" placeholder="e.g. Corner of Maple & 5th Ave">
+    </div>
+    <div class="form-group">
+      <label>Description (optional)</label>
+      <input type="text" id="submit-box-note" placeholder="e.g. Red wooden box on a post">
+    </div>
+    <button onclick="submitBoxSuggestion()" style="background:#2e7d32;color:#fff;border:none;border-radius:28px;padding:14px;font-size:1rem;font-weight:700;cursor:pointer;width:100%;box-shadow:0 3px 10px rgba(0,0,0,0.2);">Submit</button>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
+      <button onclick="closeSubmitBoxPanel()" style="background:none;border:none;color:#888;font-size:0.85rem;cursor:pointer;">Cancel</button>
+      <button onclick="closeSubmitBoxPanel(); startAddBox()" style="background:none;border:none;color:#5c4a32;font-size:0.8rem;cursor:pointer;text-decoration:underline;">Admin</button>
+    </div>
+  </div>
+</div>
+
 <!-- QR popup modal -->
 <div id="qr-modal">
   <div class="qr-modal-content">
@@ -872,13 +915,24 @@ function init() {
 
   // Auto-locate user and keep tracking
   if (navigator.geolocation) {
+    let hasCentered = false;
     navigator.geolocation.watchPosition(
       pos => {
-        updateUserLocation(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
-        // Only fly to location on first fix
-        if (!userLocationMarker._hasCentered) {
-          map.flyTo([pos.coords.latitude, pos.coords.longitude], 15);
-          userLocationMarker._hasCentered = true;
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        updateUserLocation(lat, lng, pos.coords.accuracy);
+        if (!hasCentered) {
+          map.flyTo([lat, lng], 15);
+          hasCentered = true;
+        } else {
+          // Auto-pan if user nears edge of visible map (within 20% of boundary)
+          const bounds = map.getBounds();
+          const padLat = (bounds.getNorth() - bounds.getSouth()) * 0.2;
+          const padLng = (bounds.getEast() - bounds.getWest()) * 0.2;
+          if (lat > bounds.getNorth() - padLat || lat < bounds.getSouth() + padLat ||
+              lng > bounds.getEast() - padLng || lng < bounds.getWest() + padLng) {
+            map.panTo([lat, lng]);
+          }
         }
       },
       () => {},
@@ -1312,6 +1366,37 @@ function sendNtfy(boxName, bookTitle, author) {
 // ───────────────────────────────────────────────────────────────────
 // Admin: Add New Box
 // ───────────────────────────────────────────────────────────────────
+function showSubmitBoxPanel() {
+  document.getElementById('submit-box-location').value = '';
+  document.getElementById('submit-box-note').value = '';
+  document.getElementById('submit-box-modal').classList.add('show');
+}
+
+function closeSubmitBoxPanel() {
+  document.getElementById('submit-box-modal').classList.remove('show');
+}
+
+async function submitBoxSuggestion() {
+  const location = document.getElementById('submit-box-location').value.trim();
+  if (!location) { showToast('Please enter a location'); return; }
+  const note = document.getElementById('submit-box-note').value.trim();
+
+  try {
+    if (db) {
+      await db.collection('box_suggestions').add({
+        location,
+        note,
+        submittedAt: new Date()
+      });
+    }
+    closeSubmitBoxPanel();
+    showToast('Thanks! Your suggestion has been submitted.');
+  } catch(e) {
+    console.error(e);
+    showToast('Error submitting — please try again');
+  }
+}
+
 function startAddBox() {
   requirePin(() => {
     pendingCoords = null;
