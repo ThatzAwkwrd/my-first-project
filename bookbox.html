@@ -482,6 +482,60 @@
     font-size: 0.8rem;
   }
 
+  /* Admin tool buttons */
+  .admin-tool-btn {
+    background: none;
+    border: 1.5px solid #5c4a32;
+    color: #5c4a32;
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* Analytics screen */
+  #analytics-screen { overflow-y: auto; }
+  .analytics-body { padding: 16px; padding-bottom: 40px; }
+  .analytics-box-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .analytics-box-card h3 { font-size: 0.95rem; margin-bottom: 8px; }
+  .analytics-stats-row {
+    display: flex;
+    gap: 8px;
+  }
+  .analytics-stat {
+    flex: 1;
+    text-align: center;
+  }
+  .analytics-stat .num {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: #5c4a32;
+  }
+  .analytics-stat .lbl {
+    font-size: 0.65rem;
+    color: #999;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .analytics-totals {
+    background: #5c4a32;
+    color: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    display: flex;
+    gap: 8px;
+  }
+  .analytics-totals .analytics-stat .num { color: #fff; }
+  .analytics-totals .analytics-stat .lbl { color: rgba(255,255,255,0.7); }
+
   /* Submissions list */
   .submission-card {
     background: #fff;
@@ -789,8 +843,19 @@ const CONFIG = {
     </div>
     <button id="save-box-btn" onclick="saveNewBox()" disabled>Save Book Box</button>
     <div class="or-divider" style="margin:18px 0;">admin tools</div>
-    <button onclick="openQrList()" style="background:none;border:1.5px solid #5c4a32;color:#5c4a32;border-radius:20px;padding:10px 16px;font-size:0.9rem;cursor:pointer;width:100%;">🖨️ Print All QR Codes</button>
-    <button onclick="openSubmissions()" style="background:none;border:1.5px solid #5c4a32;color:#5c4a32;border-radius:20px;padding:10px 16px;font-size:0.9rem;cursor:pointer;width:100%;margin-top:8px;">📬 View Submissions</button>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+      <button onclick="openQrList()" class="admin-tool-btn">🖨️ QR Codes</button>
+      <button onclick="openSubmissions()" class="admin-tool-btn">📬 Submissions</button>
+      <button onclick="openAnalytics()" class="admin-tool-btn">📊 Analytics</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Screen 9: Analytics ── -->
+<div id="analytics-screen" class="screen">
+  <div class="analytics-body">
+    <div id="analytics-totals-bar" class="analytics-totals"></div>
+    <div id="analytics-boxes-list"></div>
   </div>
 </div>
 
@@ -909,7 +974,7 @@ let unsubscribeBoxes = null;
 let userLocationMarker = null;
 let userLocationCircle = null;
 
-const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen'];
+const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen', 'analytics-screen'];
 let screenStack = ['map-screen'];
 
 // ───────────────────────────────────────────────────────────────────
@@ -1612,6 +1677,44 @@ async function openSubmissions() {
     console.error(e);
     list.innerHTML = '<div class="empty-state">Error loading submissions.</div>';
   }
+}
+
+function openAnalytics() {
+  const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  let totVisits = 0, totUnique = 0, totBooks = 0;
+  boxes.forEach(b => {
+    totVisits += b.totalVisits || 0;
+    totUnique += b.uniqueVisitors || 0;
+    totBooks += (b.books || []).length;
+  });
+
+  document.getElementById('analytics-totals-bar').innerHTML = `
+    <div class="analytics-stat"><div class="num">${totVisits}</div><div class="lbl">Total visits</div></div>
+    <div class="analytics-stat"><div class="num">${totUnique}</div><div class="lbl">Unique visitors</div></div>
+    <div class="analytics-stat"><div class="num">${totBooks}</div><div class="lbl">Books added</div></div>
+    <div class="analytics-stat"><div class="num">${boxes.length}</div><div class="lbl">Book boxes</div></div>
+  `;
+
+  const list = document.getElementById('analytics-boxes-list');
+  if (!boxes.length) {
+    list.innerHTML = '<div class="empty-state">No book boxes yet.</div>';
+  } else {
+    list.innerHTML = boxes.map(box => {
+      const visits = box.totalVisits || 0;
+      const unique = box.uniqueVisitors || 0;
+      const books = (box.books || []).length;
+      return `
+        <div class="analytics-box-card">
+          <h3>${escHtml(box.name)}</h3>
+          <div class="analytics-stats-row">
+            <div class="analytics-stat"><div class="num">${visits}</div><div class="lbl">Visits</div></div>
+            <div class="analytics-stat"><div class="num">${unique}</div><div class="lbl">Unique</div></div>
+            <div class="analytics-stat"><div class="num">${books}</div><div class="lbl">Books</div></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+  navigate('analytics-screen', 'Analytics', boxes.length + ' book boxes');
 }
 
 async function dismissSubmission(docId) {
