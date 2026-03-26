@@ -648,7 +648,7 @@ const CONFIG = {
   ntfyTopic: "bookbox-michel-2026",
 
   // ── Admin PIN to add/manage book boxes ──
-  adminPin: "1234",
+  adminPin: "8627",
 
   // ── Default map center (lat, lng) — set to your neighborhood ──
   mapCenter: [51.505, -0.09],
@@ -1554,20 +1554,18 @@ function openCityList() {
 // QR Codes List (Admin)
 // ───────────────────────────────────────────────────────────────────
 function openQrList() {
-  requirePin(() => {
-    const body = document.getElementById('qr-list-body');
-    const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-    if (!boxes.length) {
-      body.innerHTML = '<div class="empty-state">No book boxes yet.</div>';
-    } else {
-      body.innerHTML = boxes.map(box => `
-        <div class="qr-list-item" onclick="showQrModal('${box.id}')" style="cursor:pointer;">
-          <h3>${escHtml(box.name)}</h3>
-          <p style="color:#5c4a32;">Tap to view QR code →</p>
-        </div>`).join('');
-    }
-    navigate('qr-list-screen', 'QR Codes', boxes.length + ' book boxes');
-  });
+  const body = document.getElementById('qr-list-body');
+  const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  if (!boxes.length) {
+    body.innerHTML = '<div class="empty-state">No book boxes yet.</div>';
+  } else {
+    body.innerHTML = boxes.map(box => `
+      <div class="qr-list-item" onclick="showQrModal('${box.id}')" style="cursor:pointer;">
+        <h3>${escHtml(box.name)}</h3>
+        <p style="color:#5c4a32;">Tap to view QR code →</p>
+      </div>`).join('');
+  }
+  navigate('qr-list-screen', 'QR Codes', boxes.length + ' book boxes');
 }
 
 function showQrModal(boxId) {
