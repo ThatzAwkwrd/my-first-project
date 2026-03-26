@@ -482,6 +482,29 @@
     font-size: 0.8rem;
   }
 
+  /* Submissions list */
+  .submission-card {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .submission-card .sub-location { font-weight: 600; font-size: 0.95rem; }
+  .submission-card .sub-note { color: #666; font-size: 0.85rem; margin-top: 4px; }
+  .submission-card .sub-date { color: #aaa; font-size: 0.75rem; margin-top: 6px; }
+  .submission-card .sub-actions { margin-top: 10px; display: flex; gap: 8px; }
+  .sub-btn {
+    border: none;
+    border-radius: 16px;
+    padding: 6px 14px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .sub-btn.dismiss { background: #f0f0f0; color: #888; }
+  .sub-btn.dismiss:hover { background: #e0e0e0; }
+
   /* Submit box modal */
   #submit-box-modal {
     display: none;
@@ -767,6 +790,14 @@ const CONFIG = {
     <button id="save-box-btn" onclick="saveNewBox()" disabled>Save Book Box</button>
     <div class="or-divider" style="margin:18px 0;">admin tools</div>
     <button onclick="openQrList()" style="background:none;border:1.5px solid #5c4a32;color:#5c4a32;border-radius:20px;padding:10px 16px;font-size:0.9rem;cursor:pointer;width:100%;">🖨️ Print All QR Codes</button>
+    <button onclick="openSubmissions()" style="background:none;border:1.5px solid #5c4a32;color:#5c4a32;border-radius:20px;padding:10px 16px;font-size:0.9rem;cursor:pointer;width:100%;margin-top:8px;">📬 View Submissions</button>
+  </div>
+</div>
+
+<!-- ── Screen 8: Submissions List ── -->
+<div id="submissions-screen" class="screen">
+  <div style="padding:16px;overflow-y:auto;flex:1;">
+    <div id="submissions-list"></div>
   </div>
 </div>
 
@@ -878,7 +909,7 @@ let unsubscribeBoxes = null;
 let userLocationMarker = null;
 let userLocationCircle = null;
 
-const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen'];
+const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen'];
 let screenStack = ['map-screen'];
 
 // ───────────────────────────────────────────────────────────────────
@@ -1552,6 +1583,53 @@ function openCityList() {
 
 // ───────────────────────────────────────────────────────────────────
 // QR Codes List (Admin)
+// ───────────────────────────────────────────────────────────────────
+async function openSubmissions() {
+  const list = document.getElementById('submissions-list');
+  list.innerHTML = '<div class="empty-state">Loading…</div>';
+  navigate('submissions-screen', 'Submissions', '');
+
+  try {
+    if (!db) throw new Error('Firebase not configured');
+    const snap = await db.collection('box_suggestions').orderBy('submittedAt', 'desc').get();
+    if (snap.empty) {
+      list.innerHTML = '<div class="empty-state">No submissions yet.</div>';
+      return;
+    }
+    list.innerHTML = snap.docs.map(doc => {
+      const s = doc.data();
+      return `
+        <div class="submission-card" id="sub-${doc.id}">
+          <div class="sub-location">${escHtml(s.location || '')}</div>
+          ${s.note ? `<div class="sub-note">${escHtml(s.note)}</div>` : ''}
+          <div class="sub-date">${formatDate(s.submittedAt)}</div>
+          <div class="sub-actions">
+            <button class="sub-btn dismiss" onclick="dismissSubmission('${doc.id}')">Dismiss</button>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    console.error(e);
+    list.innerHTML = '<div class="empty-state">Error loading submissions.</div>';
+  }
+}
+
+async function dismissSubmission(docId) {
+  try {
+    await db.collection('box_suggestions').doc(docId).delete();
+    const el = document.getElementById('sub-' + docId);
+    if (el) el.remove();
+    showToast('Submission dismissed');
+    // Check if list is now empty
+    const remaining = document.querySelectorAll('.submission-card');
+    if (!remaining.length) {
+      document.getElementById('submissions-list').innerHTML = '<div class="empty-state">No submissions yet.</div>';
+    }
+  } catch(e) {
+    showToast('Error dismissing');
+  }
+}
+
 // ───────────────────────────────────────────────────────────────────
 function openQrList() {
   const body = document.getElementById('qr-list-body');
