@@ -1067,12 +1067,6 @@ function openDetail(boxId) {
   document.getElementById('stat-unique').textContent = box.uniqueVisitors || 0;
   document.getElementById('stat-checkins').textContent = (box.books || []).length;
 
-  // Generate QR code via API
-  const url = `${CONFIG.appUrl}?box=${boxId}`;
-  document.getElementById('qr-url').textContent = url;
-  const qrDiv = document.getElementById('qr-code-div');
-  qrDiv.innerHTML = `<img src="${qrImageUrl(url)}" alt="QR Code for ${escHtml(box.name)}" width="250" height="250" style="border-radius:6px;">`;
-
   renderBooks(box.books || []);
   navigate('detail-screen', box.name, box.description);
 }
