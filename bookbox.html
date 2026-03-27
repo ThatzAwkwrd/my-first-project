@@ -1452,11 +1452,7 @@ async function submitBook() {
       checkIns: firebase.firestore.FieldValue.increment(1)
     });
 
-    // Update local cache optimistically
-    if (boxData[currentBoxId]) {
-      boxData[currentBoxId].books = [...(boxData[currentBoxId].books || []), book];
-      upsertMarker(boxData[currentBoxId]);
-    }
+
 
     // Send ntfy notification
     const boxName = boxData[currentBoxId]?.name || 'a book box';
