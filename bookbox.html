@@ -1043,6 +1043,23 @@ function init() {
     );
   }
 
+  // Record site visit
+  if (db && !sessionStorage.getItem('site_visited')) {
+    sessionStorage.setItem('site_visited', '1');
+    const visitorId = getVisitorId();
+    const siteRef = db.collection('site_analytics').doc('stats');
+    const visitorRef = db.collection('site_analytics').doc('stats').collection('visitors').doc(visitorId);
+    visitorRef.get().then(snap => {
+      if (snap.exists) {
+        siteRef.update({ totalVisits: firebase.firestore.FieldValue.increment(1) }).catch(() => {});
+        visitorRef.update({ lastSeen: new Date(), visitCount: firebase.firestore.FieldValue.increment(1) }).catch(() => {});
+      } else {
+        siteRef.set({ totalVisits: firebase.firestore.FieldValue.increment(1), uniqueVisitors: firebase.firestore.FieldValue.increment(1) }, { merge: true }).catch(() => {});
+        visitorRef.set({ firstSeen: new Date(), lastSeen: new Date(), visitCount: 1 }).catch(() => {});
+      }
+    }).catch(() => {});
+  }
+
   // Subscribe to book boxes (real-time)
   if (db) {
     unsubscribeBoxes = db.collection('bookboxes').onSnapshot(snapshot => {
@@ -1120,10 +1137,19 @@ function updateHeader(title, subtitle) {
 // ───────────────────────────────────────────────────────────────────
 function isRecent(box) {
   if (!box.books || box.books.length === 0) return false;
+  // If user has already viewed this box, it's no longer "new" to them
+  const lastSeen = localStorage.getItem('box_seen_' + box.id);
   const last = box.books[box.books.length - 1].addedAt;
   if (!last) return false;
   const ts = last.toDate ? last.toDate() : new Date(last);
+  if (lastSeen && ts.getTime() <= parseInt(lastSeen)) return false;
   return (Date.now() - ts.getTime()) < 7 * 24 * 60 * 60 * 1000;
+}
+
+function markBoxSeen(boxId) {
+  localStorage.setItem('box_seen_' + boxId, Date.now().toString());
+  // Update the marker to grey
+  if (boxData[boxId]) upsertMarker(boxData[boxId]);
 }
 
 function makeIcon(recent) {
@@ -1207,6 +1233,7 @@ function openDetail(boxId) {
 
   // Record visit (fire-and-forget)
   recordVisit(boxId);
+  markBoxSeen(boxId);
 
   // Show welcome banner if user arrived via QR code scan
   const isQrVisitor = new URLSearchParams(window.location.search).has('box');
@@ -1436,6 +1463,8 @@ async function submitBook() {
     sendNtfy(boxName, book.title, book.author);
 
     showToast('Book added! 🎉');
+    btn.disabled = false;
+    btn.textContent = 'Add this book ✓';
     // Go back and refresh the detail view with the new book
     goBack();
     if (boxData[currentBoxId]) {
@@ -1715,7 +1744,10 @@ function openAllBooks() {
             <div class="book-author">${escHtml(book.author || '')}</div>
             <div class="book-date">${formatDate(book.addedAt)}</div>
           </div>
-          <button onclick="deleteBook('${box.id}', ${i})" style="position:absolute;top:8px;right:8px;background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;font-size:0.85rem;cursor:pointer;color:#888;line-height:28px;text-align:center;">✕</button>
+          <div style="position:absolute;top:8px;right:8px;display:flex;gap:4px;">
+            <button onclick="editBook('${box.id}', ${i})" style="background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;font-size:0.75rem;cursor:pointer;color:#888;line-height:28px;text-align:center;">✎</button>
+            <button onclick="deleteBook('${box.id}', ${i})" style="background:#f0f0f0;border:none;border-radius:50%;width:28px;height:28px;font-size:0.85rem;cursor:pointer;color:#888;line-height:28px;text-align:center;">✕</button>
+          </div>
         </div>`;
     });
     html += '</div>';
@@ -1754,7 +1786,36 @@ async function deleteBook(boxId, bookIndex) {
   }
 }
 
-function openAnalytics() {
+async function editBook(boxId, bookIndex) {
+  const box = boxData[boxId];
+  if (!box || !box.books || !box.books[bookIndex]) return;
+  const oldBook = box.books[bookIndex];
+
+  const newTitle = prompt('Edit title:', oldBook.title || '');
+  if (newTitle === null) return;
+  const newAuthor = prompt('Edit author:', oldBook.author || '');
+  if (newAuthor === null) return;
+
+  if (newTitle === oldBook.title && newAuthor === oldBook.author) return;
+
+  try {
+    if (!db) throw new Error('Firebase not configured');
+    // Remove old, add updated
+    const updatedBook = { ...oldBook, title: newTitle.trim(), author: newAuthor.trim() };
+    // Firestore doesn't support updating array items by index, so remove old and add new
+    const newBooks = [...box.books];
+    newBooks[bookIndex] = updatedBook;
+    await db.collection('bookboxes').doc(boxId).update({ books: newBooks });
+    box.books = newBooks;
+    showToast('Book updated');
+    openAllBooks();
+  } catch(e) {
+    console.error(e);
+    showToast('Error updating book: ' + e.message);
+  }
+}
+
+async function openAnalytics() {
   const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   let totVisits = 0, totUnique = 0, totBooks = 0;
   boxes.forEach(b => {
@@ -1763,11 +1824,24 @@ function openAnalytics() {
     totBooks += (b.books || []).length;
   });
 
+  // Fetch site-wide visit stats
+  let siteVisits = 0, siteUnique = 0;
+  try {
+    if (db) {
+      const siteSnap = await db.collection('site_analytics').doc('stats').get();
+      if (siteSnap.exists) {
+        siteVisits = siteSnap.data().totalVisits || 0;
+        siteUnique = siteSnap.data().uniqueVisitors || 0;
+      }
+    }
+  } catch(e) { console.warn('Site analytics fetch failed:', e); }
+
   document.getElementById('analytics-totals-bar').innerHTML = `
-    <div class="analytics-stat"><div class="num">${totVisits}</div><div class="lbl">Total visits</div></div>
-    <div class="analytics-stat"><div class="num">${totUnique}</div><div class="lbl">Unique visitors</div></div>
-    <div class="analytics-stat"><div class="num">${totBooks}</div><div class="lbl">Books added</div></div>
-    <div class="analytics-stat"><div class="num">${boxes.length}</div><div class="lbl">Book boxes</div></div>
+    <div class="analytics-stat"><div class="num">${siteVisits}</div><div class="lbl">Site visits</div></div>
+    <div class="analytics-stat"><div class="num">${siteUnique}</div><div class="lbl">Site unique</div></div>
+    <div class="analytics-stat"><div class="num">${totVisits}</div><div class="lbl">Box visits</div></div>
+    <div class="analytics-stat"><div class="num">${totUnique}</div><div class="lbl">Box unique</div></div>
+    <div class="analytics-stat"><div class="num">${totBooks}</div><div class="lbl">Books</div></div>
   `;
 
   const list = document.getElementById('analytics-boxes-list');
