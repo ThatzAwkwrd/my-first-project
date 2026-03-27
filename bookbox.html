@@ -482,6 +482,112 @@
     font-size: 0.8rem;
   }
 
+  /* Analytics chart */
+  .analytics-chart-container {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .chart-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 6px;
+    height: 120px;
+    padding-top: 8px;
+  }
+  .chart-bar-wrapper {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+  }
+  .chart-bar {
+    width: 100%;
+    max-width: 36px;
+    background: #7c3aed;
+    border-radius: 4px 4px 0 0;
+    min-height: 4px;
+  }
+  .chart-bar-label { font-size: 0.6rem; color: #999; margin-top: 4px; }
+  .chart-bar-value { font-size: 0.65rem; color: #7c3aed; font-weight: 600; margin-bottom: 2px; }
+  .analytics-info-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .activity-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.85rem;
+  }
+  .activity-row:last-child { border-bottom: none; }
+  .activity-row .label { color: #666; }
+  .activity-row .value { font-weight: 600; color: #333; }
+
+  /* Feedback */
+  .feedback-form-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .feedback-type-toggle { display: flex; gap: 8px; }
+  .feedback-type-btn {
+    flex: 1;
+    padding: 10px;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    background: #fff;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-align: center;
+  }
+  .feedback-type-btn.active {
+    border-color: #7c3aed;
+    background: #f5f0ff;
+    color: #7c3aed;
+    font-weight: 600;
+  }
+  #submit-feedback-btn {
+    background: #7c3aed;
+    color: #fff;
+    border: none;
+    border-radius: 28px;
+    padding: 14px;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    margin-top: 8px;
+  }
+  #submit-feedback-btn:disabled { background: #aaa; }
+  .feedback-item {
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+  .fb-type {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+  .fb-type-bug { background: #fce4ec; color: #c62828; }
+  .fb-type-suggestion { background: #e8f5e9; color: #2e7d32; }
+  .feedback-item .fb-message { font-size: 0.85rem; margin-top: 6px; color: #333; line-height: 1.4; }
+  .feedback-item .fb-date { font-size: 0.75rem; color: #aaa; margin-top: 6px; }
+
   /* Admin tool buttons */
   .admin-tool-btn {
     background: none;
@@ -760,6 +866,7 @@ const CONFIG = {
       <button class="fab" onclick="locateMe()">📍 My Location</button>
       <button class="fab" onclick="openCityList()">📋 City List</button>
       <button class="fab" onclick="openQrScanner()">📷 Scan QR</button>
+      <button class="fab" onclick="openFeedback()" style="background:#1565c0;">💬 Feedback</button>
       <button class="fab green" onclick="showSubmitBoxPanel()">+ Add Box</button>
     </div>
   </div>
@@ -847,6 +954,7 @@ const CONFIG = {
       <button onclick="openSubmissions()" class="admin-tool-btn">📬 Submissions</button>
       <button onclick="openAnalytics()" class="admin-tool-btn">📊 Analytics</button>
       <button onclick="openAllBooks()" class="admin-tool-btn">📖 All Books</button>
+      <button onclick="openFeedbackAdmin()" class="admin-tool-btn">💬 Feedback</button>
     </div>
   </div>
 </div>
@@ -858,11 +966,42 @@ const CONFIG = {
   </div>
 </div>
 
-<!-- ── Screen 9: Analytics ── -->
+<!-- ── Screen 9: Analytics Dashboard ── -->
 <div id="analytics-screen" class="screen">
   <div class="analytics-body">
-    <div id="analytics-totals-bar" class="analytics-totals"></div>
+    <div class="detail-section-title">Visitor Metrics</div>
+    <div id="analytics-visitor-metrics" class="analytics-totals"></div>
+    <div class="detail-section-title">Last 7 Days</div>
+    <div id="analytics-chart" class="analytics-chart-container"></div>
+    <div class="detail-section-title">Book Box Activity</div>
+    <div id="analytics-box-activity" class="analytics-info-card"></div>
+    <div class="detail-section-title">User Engagement</div>
+    <div id="analytics-engagement" class="analytics-info-card"></div>
+    <div class="detail-section-title">Per-Box Details</div>
     <div id="analytics-boxes-list"></div>
+  </div>
+</div>
+
+<!-- ── Screen 11: Feedback ── -->
+<div id="feedback-screen" class="screen">
+  <div style="overflow-y:auto;flex:1;padding:16px;padding-bottom:40px;">
+    <div class="feedback-form-card">
+      <h3 style="font-size:0.95rem;margin-bottom:12px;">Send us feedback</h3>
+      <div class="form-group">
+        <label>Type</label>
+        <div class="feedback-type-toggle">
+          <button class="feedback-type-btn active" data-type="suggestion" onclick="setFeedbackType('suggestion')">💡 Suggestion</button>
+          <button class="feedback-type-btn" data-type="bug" onclick="setFeedbackType('bug')">🐛 Bug Report</button>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Your message</label>
+        <textarea id="feedback-message" rows="4" placeholder="Tell us what you think..." style="width:100%;border:1.5px solid #ddd;border-radius:8px;padding:10px 12px;font-size:1rem;background:#fff;outline:none;resize:vertical;font-family:inherit;"></textarea>
+      </div>
+      <button id="submit-feedback-btn" onclick="submitFeedback()">Send Feedback</button>
+    </div>
+    <div class="detail-section-title" style="margin-top:24px;">Your submissions</div>
+    <div id="feedback-user-list"></div>
   </div>
 </div>
 
@@ -981,7 +1120,7 @@ let unsubscribeBoxes = null;
 let userLocationMarker = null;
 let userLocationCircle = null;
 
-const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen', 'analytics-screen', 'all-books-screen'];
+const SCREENS = ['map-screen', 'detail-screen', 'add-book-screen', 'add-box-screen', 'city-list-screen', 'qr-list-screen', 'qr-scan-screen', 'submissions-screen', 'analytics-screen', 'all-books-screen', 'feedback-screen'];
 let screenStack = ['map-screen'];
 
 // ───────────────────────────────────────────────────────────────────
@@ -1047,15 +1186,25 @@ function init() {
   if (db && !sessionStorage.getItem('site_visited')) {
     sessionStorage.setItem('site_visited', '1');
     const visitorId = getVisitorId();
+    const today = new Date().toISOString().slice(0, 10);
     const siteRef = db.collection('site_analytics').doc('stats');
-    const visitorRef = db.collection('site_analytics').doc('stats').collection('visitors').doc(visitorId);
+    const visitorRef = siteRef.collection('visitors').doc(visitorId);
+    const dailyRef = db.collection('daily_visits').doc(today);
+
+    // Daily visit tracking
+    dailyRef.set({
+      totalVisits: firebase.firestore.FieldValue.increment(1),
+      uniqueVisitors: firebase.firestore.FieldValue.arrayUnion(visitorId)
+    }, { merge: true }).catch(() => {});
+
+    // Site-wide tracking
     visitorRef.get().then(snap => {
       if (snap.exists) {
         siteRef.update({ totalVisits: firebase.firestore.FieldValue.increment(1) }).catch(() => {});
         visitorRef.update({ lastSeen: new Date(), visitCount: firebase.firestore.FieldValue.increment(1) }).catch(() => {});
       } else {
         siteRef.set({ totalVisits: firebase.firestore.FieldValue.increment(1), uniqueVisitors: firebase.firestore.FieldValue.increment(1) }, { merge: true }).catch(() => {});
-        visitorRef.set({ firstSeen: new Date(), lastSeen: new Date(), visitCount: 1 }).catch(() => {});
+        visitorRef.set({ firstSeen: new Date(), lastSeen: new Date(), visitCount: 1, source: 'direct' }).catch(() => {});
       }
     }).catch(() => {});
   }
@@ -1080,6 +1229,15 @@ function init() {
   const params = new URLSearchParams(window.location.search);
   const boxId = params.get('box');
   if (boxId) {
+    // Track QR scan
+    if (db) {
+      db.collection('bookboxes').doc(boxId).update({
+        qrScans: firebase.firestore.FieldValue.increment(1)
+      }).catch(() => {});
+      db.collection('site_analytics').doc('stats').set({
+        qrScans: firebase.firestore.FieldValue.increment(1)
+      }, { merge: true }).catch(() => {});
+    }
     // Wait briefly for Firestore to load, then open box detail
     setTimeout(() => openDetail(boxId), 1200);
   }
@@ -1812,34 +1970,109 @@ async function editBook(boxId, bookIndex) {
 }
 
 async function openAnalytics() {
-  const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-  let totVisits = 0, totUnique = 0, totBooks = 0;
-  boxes.forEach(b => {
-    totVisits += b.totalVisits || 0;
-    totUnique += b.uniqueVisitors || 0;
-    totBooks += (b.books || []).length;
-  });
+  navigate('analytics-screen', 'Analytics', '');
+  document.getElementById('analytics-visitor-metrics').innerHTML =
+    '<div class="analytics-stat"><div class="num">…</div><div class="lbl">Loading</div></div>';
 
-  // Fetch site-wide visit stats
-  let siteVisits = 0, siteUnique = 0;
+  const boxes = Object.values(boxData).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+  let totBooks = 0;
+  boxes.forEach(b => totBooks += (b.books || []).length);
+
+  // 1. Fetch site stats
+  let siteVisits = 0, siteUnique = 0, totalQrScans = 0;
   try {
     if (db) {
       const siteSnap = await db.collection('site_analytics').doc('stats').get();
       if (siteSnap.exists) {
-        siteVisits = siteSnap.data().totalVisits || 0;
-        siteUnique = siteSnap.data().uniqueVisitors || 0;
+        const d = siteSnap.data();
+        siteVisits = d.totalVisits || 0;
+        siteUnique = d.uniqueVisitors || 0;
+        totalQrScans = d.qrScans || 0;
       }
     }
-  } catch(e) { console.warn('Site analytics fetch failed:', e); }
+  } catch(e) {}
 
-  document.getElementById('analytics-totals-bar').innerHTML = `
-    <div class="analytics-stat"><div class="num">${siteVisits}</div><div class="lbl">Site visits</div></div>
-    <div class="analytics-stat"><div class="num">${siteUnique}</div><div class="lbl">Site unique</div></div>
-    <div class="analytics-stat"><div class="num">${totVisits}</div><div class="lbl">Box visits</div></div>
-    <div class="analytics-stat"><div class="num">${totUnique}</div><div class="lbl">Box unique</div></div>
-    <div class="analytics-stat"><div class="num">${totBooks}</div><div class="lbl">Books</div></div>
+  // 2. Fetch last 7 days
+  const days = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    days.push(d.toISOString().slice(0, 10));
+  }
+  const dailyData = {};
+  let todayVisits = 0, weeklyVisits = 0;
+  try {
+    if (db) {
+      const snaps = await Promise.all(days.map(day => db.collection('daily_visits').doc(day).get()));
+      snaps.forEach((snap, i) => {
+        const v = snap.exists ? (snap.data().totalVisits || 0) : 0;
+        dailyData[days[i]] = v;
+        weeklyVisits += v;
+      });
+      todayVisits = dailyData[days[6]] || 0;
+    }
+  } catch(e) {}
+
+  // 3. New vs returning visitors
+  let newVisitors = 0, returningVisitors = 0;
+  try {
+    if (db) {
+      const visSnap = await db.collection('site_analytics').doc('stats').collection('visitors').get();
+      visSnap.forEach(doc => {
+        if ((doc.data().visitCount || 1) === 1) newVisitors++;
+        else returningVisitors++;
+      });
+    }
+  } catch(e) {}
+
+  // 4. Find most popular box, most recent check-in
+  let topBox = null, topCheckIns = 0, recentBox = null, recentTime = 0;
+  boxes.forEach(box => {
+    const count = (box.books || []).length;
+    if (count > topCheckIns) { topCheckIns = count; topBox = box; }
+    (box.books || []).forEach(b => {
+      const t = b.addedAt ? (b.addedAt.toDate ? b.addedAt.toDate().getTime() : new Date(b.addedAt).getTime()) : 0;
+      if (t > recentTime) { recentTime = t; recentBox = box; }
+    });
+  });
+
+  // ── Render visitor metrics ──
+  document.getElementById('analytics-visitor-metrics').innerHTML = `
+    <div class="analytics-stat"><div class="num">${siteVisits}</div><div class="lbl">All-time visits</div></div>
+    <div class="analytics-stat"><div class="num">${siteUnique}</div><div class="lbl">Unique visitors</div></div>
+    <div class="analytics-stat"><div class="num">${todayVisits}</div><div class="lbl">Today</div></div>
+    <div class="analytics-stat"><div class="num">${weeklyVisits}</div><div class="lbl">This week</div></div>
   `;
 
+  // ── Render chart ──
+  const max = Math.max(...Object.values(dailyData), 1);
+  document.getElementById('analytics-chart').innerHTML = '<div class="chart-bars">' +
+    days.map(day => {
+      const count = dailyData[day] || 0;
+      const height = Math.round((count / max) * 100);
+      const label = new Date(day + 'T12:00:00').toLocaleDateString('en', { weekday: 'short' });
+      return `<div class="chart-bar-wrapper">
+        <div class="chart-bar-value">${count}</div>
+        <div class="chart-bar" style="height:${height}%"></div>
+        <div class="chart-bar-label">${label}</div>
+      </div>`;
+    }).join('') + '</div>';
+
+  // ── Render box activity ──
+  document.getElementById('analytics-box-activity').innerHTML = `
+    <div class="activity-row"><span class="label">Total books added</span><span class="value">${totBooks}</span></div>
+    <div class="activity-row"><span class="label">Most popular box</span><span class="value">${topBox ? escHtml(topBox.name) + ' (' + topCheckIns + ')' : '—'}</span></div>
+    <div class="activity-row"><span class="label">Most recent check-in</span><span class="value">${recentBox ? escHtml(recentBox.name) + ' · ' + formatDate(recentTime ? new Date(recentTime) : null) : '—'}</span></div>
+    <div class="activity-row"><span class="label">Total QR scans</span><span class="value">${totalQrScans}</span></div>
+  `;
+
+  // ── Render engagement ──
+  document.getElementById('analytics-engagement').innerHTML = `
+    <div class="activity-row"><span class="label">New visitors</span><span class="value">${newVisitors}</span></div>
+    <div class="activity-row"><span class="label">Returning visitors</span><span class="value">${returningVisitors}</span></div>
+    <div class="activity-row"><span class="label">Total QR scans</span><span class="value">${totalQrScans}</span></div>
+  `;
+
+  // ── Render per-box breakdown ──
   const list = document.getElementById('analytics-boxes-list');
   if (!boxes.length) {
     list.innerHTML = '<div class="empty-state">No book boxes yet.</div>';
@@ -1848,6 +2081,7 @@ async function openAnalytics() {
       const visits = box.totalVisits || 0;
       const unique = box.uniqueVisitors || 0;
       const books = (box.books || []).length;
+      const qr = box.qrScans || 0;
       return `
         <div class="analytics-box-card">
           <h3>${escHtml(box.name)}</h3>
@@ -1855,11 +2089,11 @@ async function openAnalytics() {
             <div class="analytics-stat"><div class="num">${visits}</div><div class="lbl">Visits</div></div>
             <div class="analytics-stat"><div class="num">${unique}</div><div class="lbl">Unique</div></div>
             <div class="analytics-stat"><div class="num">${books}</div><div class="lbl">Books</div></div>
+            <div class="analytics-stat"><div class="num">${qr}</div><div class="lbl">QR scans</div></div>
           </div>
         </div>`;
     }).join('');
   }
-  navigate('analytics-screen', 'Analytics', boxes.length + ' book boxes');
 }
 
 async function dismissSubmission(docId) {
@@ -1915,6 +2149,117 @@ function closeQrModal() {
 let qrStream = null;
 let qrAnimFrame = null;
 
+// ───────────────────────────────────────────────────────────────────
+// Feedback
+// ───────────────────────────────────────────────────────────────────
+let feedbackType = 'suggestion';
+
+function openFeedback() {
+  document.getElementById('feedback-message').value = '';
+  feedbackType = 'suggestion';
+  document.querySelectorAll('.feedback-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === 'suggestion');
+  });
+  navigate('feedback-screen', 'Feedback', '');
+  loadUserFeedback();
+}
+
+function setFeedbackType(type) {
+  feedbackType = type;
+  document.querySelectorAll('.feedback-type-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.type === type);
+  });
+}
+
+async function submitFeedback() {
+  const message = document.getElementById('feedback-message').value.trim();
+  if (!message) { showToast('Please enter a message'); return; }
+  const btn = document.getElementById('submit-feedback-btn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  try {
+    if (!db) throw new Error('Firebase not configured');
+    await db.collection('feedback').add({
+      type: feedbackType,
+      message,
+      visitorId: getVisitorId(),
+      createdAt: new Date(),
+      status: 'new'
+    });
+    showToast('Thanks for your feedback!');
+    document.getElementById('feedback-message').value = '';
+    loadUserFeedback();
+  } catch(e) {
+    showToast('Error sending feedback');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Send Feedback';
+}
+
+async function loadUserFeedback() {
+  const list = document.getElementById('feedback-user-list');
+  try {
+    if (!db) return;
+    const snap = await db.collection('feedback')
+      .where('visitorId', '==', getVisitorId())
+      .orderBy('createdAt', 'desc')
+      .get();
+    if (snap.empty) {
+      list.innerHTML = '<div class="empty-state">No feedback submitted yet.</div>';
+    } else {
+      list.innerHTML = snap.docs.map(doc => {
+        const d = doc.data();
+        return `
+          <div class="feedback-item">
+            <span class="fb-type fb-type-${d.type}">${d.type === 'bug' ? '🐛 Bug' : '💡 Suggestion'}</span>
+            <div class="fb-message">${escHtml(d.message)}</div>
+            <div class="fb-date">${formatDate(d.createdAt)}</div>
+          </div>`;
+      }).join('');
+    }
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state">Could not load feedback.</div>';
+  }
+}
+
+async function openFeedbackAdmin() {
+  navigate('feedback-screen', 'All Feedback (Admin)', '');
+  const list = document.getElementById('feedback-user-list');
+  list.innerHTML = '<div class="empty-state">Loading…</div>';
+  try {
+    if (!db) throw new Error('Firebase not configured');
+    const snap = await db.collection('feedback').orderBy('createdAt', 'desc').get();
+    if (snap.empty) {
+      list.innerHTML = '<div class="empty-state">No feedback yet.</div>';
+    } else {
+      list.innerHTML = snap.docs.map(doc => {
+        const d = doc.data();
+        return `
+          <div class="feedback-item" id="fb-${doc.id}">
+            <span class="fb-type fb-type-${d.type}">${d.type === 'bug' ? '🐛 Bug' : '💡 Suggestion'}</span>
+            <div class="fb-message">${escHtml(d.message)}</div>
+            <div class="fb-date">${formatDate(d.createdAt)}</div>
+            <button onclick="dismissFeedback('${doc.id}')" class="sub-btn dismiss" style="margin-top:8px;">Dismiss</button>
+          </div>`;
+      }).join('');
+    }
+  } catch(e) {
+    list.innerHTML = '<div class="empty-state">Error loading feedback.</div>';
+  }
+}
+
+async function dismissFeedback(docId) {
+  try {
+    await db.collection('feedback').doc(docId).delete();
+    const el = document.getElementById('fb-' + docId);
+    if (el) el.remove();
+    showToast('Feedback dismissed');
+  } catch(e) { showToast('Error dismissing'); }
+}
+
+// ───────────────────────────────────────────────────────────────────
+// QR Scanner
+// ───────────────────────────────────────────────────────────────────
 function openQrScanner() {
   navigate('qr-scan-screen', 'Scan QR Code', '');
   startQrCamera();
@@ -2051,6 +2396,11 @@ async function recordVisit(boxId) {
         visitorRef.set({ firstSeen: new Date(), lastSeen: new Date(), visitCount: 1 })
       ]);
     }
+    // Daily per-box visit tracking
+    const today = new Date().toISOString().slice(0, 10);
+    db.collection('daily_visits').doc(today).set({
+      [`boxVisits.${boxId}`]: firebase.firestore.FieldValue.increment(1)
+    }, { merge: true }).catch(() => {});
   } catch(e) {
     console.warn('Analytics recording failed (non-fatal):', e);
   }
